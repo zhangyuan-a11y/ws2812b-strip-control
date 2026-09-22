@@ -26,6 +26,7 @@ git clone https://github.com/zhangyuan-a11y/ws2812b-strip-control.git \
 | `assets/strip_console.py` | 现成件：把串口包成本地 HTTP 服务（`127.0.0.1:877x`） |
 | `assets/strip_ui.html` | 现成件：配套中文控制台网页（亮度 / 单色 / 灯效 / 呼吸快慢 / 用电上限） |
 | `firmware/` | 参考固件：ESP32-S3 上完整可编译可烧录的实现（含 N16R8 配置、诊断固件、最小验证程序） |
+| `docs/wiring/` | 接线图：板子焊点位置、独立 5V 供电接法、排针对照表、实拍复核（**先看这两张**） |
 
 ## 核心结论（三条硬约束）
 
