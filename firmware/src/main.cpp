@@ -29,6 +29,7 @@
  *   b<数字>   亮度 0~255，例：b110                 （会永久保存）
  *   c<RRGGBB> 单色，例：cFF8000，同时切到"纯色常亮"（会永久保存）
  *   f<0~18>   直接选灯效编号（一共 19 个）          （会永久保存）
+ *   0         关灯（只是临时关，不写 Flash；下次上电还是接着放上一个灯效）
  *   s<1~8>    呼吸快慢，1 最慢（约 4.1 秒）         （会永久保存）
  *   m<毫安>   电流上限，0 = 不限，超了自动整条压暗   （会永久保存）
  *   d<0~3>    数据脚驱动电流档 5 / 10 / 20 / 40 mA  （会永久保存）
@@ -791,7 +792,12 @@ static void renderFrame() {
 }
 
 static void setEffect(Effect e, bool save = true) {
-  if (e != FX_OFF) gLastFx = e;
+  // "关灯"是临时动作：只改当前状态，不写进 Flash。
+  // 这样拔电再插上，开机还是接着放最后一次真正选的灯效。
+  if (e != FX_OFF) {
+    gLastFx = e;
+    if (save) gPrefs.putUChar("fx", (uint8_t)e);
+  }
   gEffect   = e;
   gHue16    = 0;
   gWipe     = -1;
@@ -806,7 +812,6 @@ static void setEffect(Effect e, bool save = true) {
   gDuoOff     = 0;
   gDuoTk      = 0;
   memset(gHeat, 0, sizeof(gHeat));
-  if (save) gPrefs.putUChar("fx", (uint8_t)e);
   fillAll(0, 0, 0);
   sendFrame();
 }
@@ -835,9 +840,10 @@ static void printHelp() {
   Serial.println("  n<数字>  灯珠数量，例 n11   （永久保存）");
   Serial.println("  b<数字>  亮度 0~255，例 b110（永久保存）");
   Serial.println("  c<RRGGBB> 单色，例 cFF8000   （永久保存）");
-  Serial.println("  f<0~16>  直接选灯效，例 f8 （永久保存）");
+  Serial.println("  f<0~18>  直接选灯效，例 f8 （永久保存）");
   Serial.println("  快捷：1 彩虹流动  2 逐颗扫描  3 整条呼吸  4 彗星来回");
   Serial.println("        5 全白长亮  6 整体变色  7 纯色常亮  0 关灯");
+  Serial.println("        关灯只是临时关：开机照样接着放上次那个灯效（关灯不写进 Flash）");
   Serial.println("  更多：8 纯色呼吸   9 彩虹呼吸  10 跑马灯   11 双色追逐");
   Serial.println("        12 彩虹流星 13 星星闪烁  14 篝火     15 警灯");
   Serial.println("        16 彩虹波浪");
@@ -848,6 +854,7 @@ static void printHelp() {
   Serial.println("  t 自检   w Wi-Fi 热点   ? 显示本帮助");
   Serial.printf("  当前：效果=%s  亮度=%u  灯珠=%u 颗  数据脚=GPIO%d\n",
                 fxName(gEffect), gBright, gNumLeds, DATA_PIN);
+  Serial.printf("  开机自动放：%s   （想换就选个灯效，选完就记住了）\n", fxName(gLastFx));
   Serial.printf("  波形档=%s   数据脚驱动=%s\n", gWaves[gWave].name, gDriveNames[gDrive]);
   Serial.println("  发送方式：x1 = SPI 直发（默认，整帧一次发完、无缝隙）");
   Serial.println("            x0 = 老 RMT 分包（每 6 颗一道缝，只做对照用）");
@@ -1045,7 +1052,9 @@ static void applyCommand(char *s) {
       case '5': setEffect(FX_WHITE);   Serial.printf(">> 效果：%s\n", fxName(gEffect)); return;
       case '6': setEffect(FX_CHASE);   Serial.printf(">> 效果：%s\n", fxName(gEffect)); return;
       case '7': setEffect(FX_SOLID);   Serial.printf(">> 效果：%s\n", fxName(gEffect)); return;
-      case '0': setEffect(FX_OFF);     Serial.println(">> 关灯");                      return;
+      case '0': setEffect(FX_OFF);
+                Serial.printf(">> 关灯（临时关，开机还是接着放「%s」）\n", fxName(gLastFx));
+                return;
       case 't': case 'T': selfTest();  return;
       case '?': printHelp();           return;
       default: break;
@@ -1257,12 +1266,13 @@ void setup() {
   gTzMin   = gPrefs.getInt("tz", 480);
   if (gNumLeds < 1 || gNumLeds > MAX_LEDS) gNumLeds = DEF_LEDS;
   if (fx >= (uint8_t)FX_COUNT) fx = (uint8_t)FX_RAINBOW;
+  if (fx == (uint8_t)FX_OFF) fx = (uint8_t)FX_RAINBOW;   // 老固件把"关灯"也存了，当成没记录
   if (gOnMin  > 1439) gOnMin  = 19 * 60;
   if (gOffMin > 1439) gOffMin = 23 * 60;
   if (gWave  >= WAVE_COUNT) gWave = 0;
   if (gDrive > 3)           gDrive = 2;
   gEffect = (Effect)fx;
-  gLastFx = (gEffect == FX_OFF) ? FX_RAINBOW : gEffect;
+  gLastFx = gEffect;
 
   Serial.printf("  板子里记着：%u 颗灯珠，亮度 %u，效果 %s\n",
                 gNumLeds, gBright, fxName(gEffect));
