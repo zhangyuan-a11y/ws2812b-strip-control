@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>灯带控制台</title>
+<style>
+  :root{
+    --bg:#0b0f14; --card:#141a22; --line:#242c37; --line2:#2f3945;
+    --txt:#e8eef6; --dim:#8593a5; --acc:#4f9cf9; --ok:#3fb950;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:26px 18px 48px}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px}
+  h1{font-size:19px; margin:0; font-weight:600; letter-spacing:.01em}
+  h1 small{color:var(--dim); font-weight:400; font-size:13px; margin-left:8px}
+  .stat{font-size:13px; color:var(--dim); display:flex; align-items:center}
+  .dot{width:9px; height:9px; border-radius:50%; background:#4a5563; margin-right:7px; transition:.3s}
+  .dot.on{background:var(--ok); box-shadow:0 0 10px rgba(63,185,80,.8)}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:16px 18px; margin-bottom:14px;
+  }
+  h2{font-size:12px; color:var(--dim); font-weight:600; margin:0 0 13px; letter-spacing:.1em}
+  .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  input[type=number]{
+    width:96px; padding:10px 12px; font-size:17px; font-weight:600; text-align:center;
+    color:var(--txt); background:#0d1319; border:1px solid var(--line2); border-radius:9px;
+    font-family:inherit;
+  }
+  input[type=number]:focus{outline:none; border-color:var(--acc)}
+  .unit{color:var(--dim); font-size:14px}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; flex:1; min-width:180px; height:6px;
+    background:linear-gradient(90deg,#1f6feb,#58a6ff,#a5d6ff); border-radius:99px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+    background:#fff; border:3px solid var(--acc); cursor:pointer; box-shadow:0 1px 6px rgba(0,0,0,.5);
+  }
+  select{
+    padding:9px 11px; font:inherit; color:var(--txt); background:#0d1319;
+    border:1px solid var(--line2); border-radius:9px; cursor:pointer;
+  }
+  select:focus{outline:none; border-color:var(--acc)}
+  button{
+    font:inherit; color:var(--txt); background:#1b232d; border:1px solid var(--line2);
+    border-radius:10px; padding:9px 15px; cursor:pointer; transition:.14s; white-space:nowrap;
+  }
+  button:hover{background:#232d39; border-color:#3d4a5a}
+  button:active{transform:scale(.97)}
+  button.pri{background:var(--acc); border-color:var(--acc); color:#04101f; font-weight:600}
+  button.pri:hover{background:#6cb0ff}
+  button.mini{padding:6px 11px; font-size:13px; color:var(--dim)}
+  button.mini:hover{color:var(--txt)}
+  input[type=color]{
+    width:54px; height:42px; padding:3px; background:#0d1319;
+    border:1px solid var(--line2); border-radius:9px; cursor:pointer;
+  }
+  input.hex{
+    width:108px; padding:10px 12px; font:600 15px/1.2 ui-monospace,Menlo,monospace;
+    text-transform:uppercase; text-align:center; color:var(--txt);
+    background:#0d1319; border:1px solid var(--line2); border-radius:9px;
+  }
+  input.hex:focus{outline:none; border-color:var(--acc)}
+  .sw{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:8px; margin-top:14px}
+  .sw button{
+    width:100%; height:34px; padding:0; border-radius:9px;
+    border:1px solid #00000066; box-shadow:inset 0 0 0 1px #ffffff1f;
+  }
+  .sw button:hover{transform:scale(1.06)}
+  .eff{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px}
+  .eff button{padding:13px 10px; font-size:14px}
+  .eff button.cur, #colOn.cur, #colBreathe.cur{border-color:var(--acc); background:#12263f; color:#9dcaff; font-weight:600}
+  .val{min-width:44px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600}
+  #log{
+    background:#080c11; border:1px solid var(--line); border-radius:10px; padding:11px 13px;
+    height:168px; overflow-y:auto; font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:#9fb3c8; white-space:pre-wrap; word-break:break-all;
+  }
+  #tip{font-size:13px; color:var(--dim); min-height:20px; margin-top:10px}
+  .hint{font-size:12.5px; color:var(--dim); margin-top:10px; line-height:1.7}
+  code{background:#0d1319; padding:1px 6px; border-radius:5px; color:#9dcaff; font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>灯带控制台<small>WS2812B · ESP32-S3</small></h1>
+    <div class="stat"><span class="dot" id="dot"></span><span id="portTxt">正在连接…</span></div>
+  </header>
+
+  <div class="card">
+    <h2>灯珠数量</h2>
+    <div class="row">
+      <input type="number" id="nLeds" value="11" min="1" max="300">
+      <span class="unit">颗</span>
+      <button class="mini" data-n="11">11</button>
+      <button class="mini" data-n="24">24</button>
+      <button class="mini" data-n="30">30</button>
+      <button class="mini" data-n="60">60</button>
+      <button class="pri" id="applyN">应用并保存</button>
+    </div>
+    <div class="hint">改完立刻生效，而且断电也记得。填少了：尾巴那几颗不亮；填多了：效果会在最后空跑一段。</div>
+  </div>
+
+  <div class="card">
+    <h2>按长度算颗数（每米 200 颗）</h2>
+    <div class="row">
+      <input type="number" id="lenVal" value="18" min="0.1" step="0.1">
+      <select id="lenUnit">
+        <option value="cm">厘米</option>
+        <option value="m">米</option>
+      </select>
+      <span class="unit">长，算出来是</span>
+      <span class="val" id="lenCalc">11 颗</span>
+    </div>
+    <div class="row">
+      <button class="mini" id="lenMinus">− 1 颗</button>
+      <button class="mini" id="lenPlus">＋ 1 颗</button>
+      <button class="pri" id="lenApply">用这个数量</button>
+    </div>
+    <div class="hint">
+      你这种灯带是每米 200 颗，也就是 1 厘米 2 颗：长度（厘米）× 2 = 颗数。<br>
+      算完点「用这个数量」先试，然后看灯带两头：<br>
+      · 尾巴还有几颗不亮 → 用 ＋ 往上加，加到全亮<br>
+      · 光效走到尽头还空跑一段 → 用 − 往下减，减到刚好到头
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>亮度</h2>
+    <div class="row">
+      <input type="range" id="bri" min="1" max="255" value="110">
+      <span class="val" id="briVal">110</span>
+    </div>
+    <div class="hint">调高更亮也更耗电（每颗全白约 60 毫安）。颗数多的时候，记得用独立 5V 电源。</div>
+  </div>
+
+  <div class="card">
+    <h2>单色常亮（自由选颜色）</h2>
+    <div class="row">
+      <input type="color" id="col" value="#ff8000" title="点一下挑颜色">
+      <input type="text" id="colHex" class="hex" value="FF8000" maxlength="7" spellcheck="false"
+             title="也可以直接填 6 位色号，例如 FF8000">
+      <button class="pri" id="colOn" data-name="纯色常亮">点亮（常亮）</button>
+      <button id="colBreathe" data-name="纯色呼吸">同色呼吸</button>
+    </div>
+    <div class="sw" id="swatches"></div>
+    <div class="row" style="margin-top:16px">
+      <span class="unit">亮度</span>
+      <input type="range" id="bri2" min="1" max="255" value="110">
+      <span class="val" id="briVal2">110</span>
+    </div>
+    <div class="hint">
+      下面的色块<b>点一下就立刻变</b>；想自己调，就用左边的取色盘或直接填色号，然后点「点亮（常亮）」。<br>
+      点「同色呼吸」是同一个颜色慢慢明暗。设好以后断电也记得，下次开机还是这个颜色。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>灯效模式</h2>
+    <div class="eff" id="effects">
+      <button data-cmd="1" data-name="彩虹流动">🌈 彩虹流动</button>
+      <button data-cmd="2" data-name="逐颗扫描">➡️ 逐颗扫描</button>
+      <button data-cmd="3" data-name="整条呼吸">🫧 整条呼吸</button>
+      <button data-cmd="4" data-name="彗星来回">☄️ 彗星来回</button>
+      <button data-cmd="5" data-name="全白长亮">⚪️ 全白长亮</button>
+      <button data-cmd="6" data-name="整体变色">🎨 整体变色</button>
+      <button data-cmd="f9" data-name="彩虹呼吸">🌬️ 彩虹呼吸</button>
+      <button data-cmd="f10" data-name="跑马灯">🐎 跑马灯</button>
+      <button data-cmd="f11" data-name="双色追逐">🎭 双色追逐</button>
+      <button data-cmd="f12" data-name="彩虹流星">🌠 彩虹流星</button>
+      <button data-cmd="f13" data-name="星星闪烁">✨ 星星闪烁</button>
+      <button data-cmd="f14" data-name="篝火">🔥 篝火</button>
+      <button data-cmd="f15" data-name="警灯">🚨 警灯</button>
+      <button data-cmd="f16" data-name="彩虹波浪">🌀 彩虹波浪</button>
+      <button data-cmd="0" data-name="关灯">🌑 关灯</button>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <span class="unit">呼吸快慢</span>
+      <input type="range" id="brs" min="1" max="8" value="1">
+      <span class="val" id="brsVal">1（约 4.1 秒一次）</span>
+    </div>
+    <div class="hint">
+      只管三种呼吸（整条呼吸 / 纯色呼吸 / 彩虹呼吸）。往左更慢、往右更快：<b>1 最慢，约 4.1 秒一个来回</b>。<br>
+      现在的呼吸两头是"软着陆"（到最亮、最暗都不会一顿），所以偏慢一点更耐看。改完立刻生效，断电也记得。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>排查闪烁：点一下切一档，盯着灯带看哪档不闪</h2>
+    <div class="eff" id="waves">
+      <button data-cmd="p0" data-name="波形 P0 基准">P0 基准 800kHz（一直在用的）</button>
+      <button data-cmd="p1" data-name="波形 P1 慢速">P1 慢速 667kHz</button>
+      <button data-cmd="p2" data-name="波形 P2 高电平加长">P2 高电平加长 714kHz</button>
+      <button data-cmd="p3" data-name="波形 P3 半速">P3 半速 556kHz</button>
+    </div>
+    <div class="eff" id="drives">
+      <button data-cmd="d0" data-name="驱动 5mA">驱动 5mA</button>
+      <button data-cmd="d1" data-name="驱动 10mA">驱动 10mA</button>
+      <button data-cmd="d2" data-name="驱动 20mA">驱动 20mA（默认）</button>
+      <button data-cmd="d3" data-name="驱动 40mA">驱动 40mA</button>
+    </div>
+    <div class="eff">
+      <button data-cmd="f17" data-name="斑马纹(静止画面)">🦓 斑马纹：每4颗亮1颗，画面完全不动</button>
+    </div>
+    <div class="hint">
+      先点 🦓 斑马纹：它是静止画面，黑白分明，<b>如果黑的地方还在闪，就跟灯效算法无关</b>。<br>
+      再把灯效切到彩虹/彗星，依次点 P0→P1→P2→P3：哪一档闪得最轻，就把那档当默认。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>工具</h2>
+    <div class="row">
+      <button id="btnTest">跑一次自检（红绿蓝白）</button>
+      <button id="btnRead">读板子当前设置</button>
+      <button id="btnReconnect">重连开发板</button>
+    </div>
+    <div id="tip"></div>
+  </div>
+
+  <div class="card">
+    <h2>用电保护（几条灯带并联时用）</h2>
+    <div class="row">
+      <input type="number" id="maVal" value="0" min="0" max="60000" step="500">
+      <span>毫安　（0 = 不限制）</span>
+      <button class="pri" id="maApply">应用并保存</button>
+    </div>
+    <div class="hint">
+      填 <b>电源额定电流的 80%</b>：10A 电源填 <b>8000</b>，15A 电源填 <b>12000</b>。<br>
+      超过上限时固件会把这一帧<b>整体等比压暗</b> —— 灯效不变形，也绝不会把电源拉垮。<br>
+      板子现在实际吃电：<span class="val" id="maNow">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>板子回话</h2>
+    <div id="log"></div>
+    <div class="hint">
+      关掉这个页面不影响灯带 —— 板子会一直保持你设好的灯珠数量和灯效。<br>
+      想彻底退出控制台：回到刚才那个黑色终端窗口，按 <code>Control + C</code>。
+    </div>
+  </div>
+
+</div>
+
+<script>
+var lastLog = "";
+var curEffect = null;
+
+function $(id){ return document.getElementById(id); }
+
+function tip(msg, color){
+  var el = $("tip");
+  el.textContent = msg;
+  el.style.color = color || "#8593a5";
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.textContent = ""; }, 4000);
+}
+
+function api(path){
+  return fetch(path).then(function(r){ return r.json(); })
+                    .catch(function(){ return { ok:false, error:"本地服务没响应" }; });
+}
+
+function send(cmd, note){
+  return api("/api/send?cmd=" + encodeURIComponent(cmd)).then(function(j){
+    if (j.ok) { tip((note || "已发送") + " ✅", "#3fb950"); }
+    else      { tip((note || "发送失败") + "：" + (j.error || ""), "#ff7b72"); }
+    return j;
+  });
+}
+
+// 会亮"选中"状态的按钮：灯效模式那一格，外加单色常亮卡里的两颗
+// （纯色常亮 / 纯色呼吸搬到了上面那张卡，这里要让它们照样能高亮）
+function fxButtons(){
+  return document.querySelectorAll("#effects button, #colOn, #colBreathe");
+}
+
+function markEffect(name){
+  if (!name || name === curEffect) return;
+  curEffect = name;
+  fxButtons().forEach(function(b){
+    if (b.dataset.name === name) b.classList.add("cur");
+    else b.classList.remove("cur");
+  });
+}
+
+function refresh(){
+  api("/api/state").then(function(s){
+    var dot = $("dot");
+    if (s.connected) { dot.classList.add("on");  $("portTxt").textContent = s.port || "已连接"; }
+    else             { dot.classList.remove("on"); $("portTxt").textContent = "没找到开发板"; }
+
+    if (s.n && document.activeElement !== $("nLeds")) { $("nLeds").value = s.n; }
+    if (s.bri && document.activeElement !== $("bri") && document.activeElement !== $("bri2")) {
+      setBriUI(s.bri);
+    }
+    if (s.color && s.color !== curColor && Date.now() > colHold &&
+        document.activeElement !== $("colHex") && document.activeElement !== $("col")) {
+      showColorUI(s.color);
+    }
+    markEffect(s.fx);
+
+    if (s.brs && document.activeElement !== $("brs")) { setBrsUI(s.brs); }
+
+    if (typeof s.ma === "number") {
+      $("maNow").textContent = s.ma + " 毫安" + (s.maCap ? ("（上限 " + s.maCap + "）") : "（没设上限）");
+      if (typeof s.maCap === "number" && document.activeElement !== $("maVal")) {
+        $("maVal").value = s.maCap;
+      }
+    }
+
+    if (s.log && s.log !== lastLog){
+      lastLog = s.log;
+      var box = $("log");
+      var atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+      box.textContent = s.log;
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    }
+  }).then(function(){ setTimeout(refresh, 1200); });
+}
+
+document.querySelectorAll("[data-n]").forEach(function(b){
+  b.onclick = function(){ $("nLeds").value = b.dataset.n; };
+});
+
+$("applyN").onclick = function(){
+  var n = parseInt($("nLeds").value, 10);
+  if (!(n >= 1 && n <= 300)) { tip("灯珠数量要在 1 ~ 300 之间", "#ff7b72"); return; }
+  send("n" + n, "灯珠数量已设为 " + n + " 颗");
+};
+
+$("maApply").onclick = function(){
+  var v = parseInt($("maVal").value, 10);
+  if (isNaN(v) || v < 0) v = 0;
+  if (v > 60000) v = 60000;
+  $("maVal").value = v;
+  send("m" + v, v === 0 ? "电流上限：不限制" : ("电流上限已设为 " + v + " 毫安"));
+};
+
+// ------------------------------------------------ 按长度算颗数
+var LEN_PER_CM = 2.0;      // 每米 200 颗 = 每厘米 2 颗
+var lenCount = 11;         // 算出来的数量，可以再 ± 微调
+
+function showLen(n){
+  lenCount = Math.min(300, Math.max(1, n));
+  $("lenCalc").textContent = lenCount + " 颗";
+}
+
+function calcLen(){
+  var v = parseFloat($("lenVal").value);
+  if (!(v > 0)) return null;
+  var cm = ($("lenUnit").value === "m") ? v * 100 : v;
+  return Math.round(cm * LEN_PER_CM);
+}
+
+function lenChanged(){
+  var n = calcLen();
+  showLen(n === null ? 1 : n);
+}
+
+$("lenVal").oninput = lenChanged;
+$("lenUnit").onchange = lenChanged;
+$("lenMinus").onclick = function(){ showLen(lenCount - 1); };
+$("lenPlus").onclick  = function(){ showLen(lenCount + 1); };
+$("lenApply").onclick = function(){
+  $("nLeds").value = lenCount;
+  send("n" + lenCount, "灯珠数量已设为 " + lenCount + " 颗");
+};
+
+// ------------------------------------------------ 亮度（上下两块滑块联动）
+var briTimer = null;
+
+function setBriUI(v){
+  v = Math.min(255, Math.max(1, parseInt(v, 10) || 1));
+  $("bri").value  = v;
+  $("bri2").value = v;
+  $("briVal").textContent  = v;
+  $("briVal2").textContent = v;
+}
+
+function pushBri(v){
+  setBriUI(v);
+  clearTimeout(briTimer);
+  briTimer = setTimeout(function(){ send("b" + $("bri").value, "亮度 " + $("bri").value); }, 350);
+}
+
+$("bri").oninput  = function(){ pushBri(this.value); };
+$("bri2").oninput = function(){ pushBri(this.value); };
+
+// ------------------------------------------------ 呼吸快慢
+var BRS_SEC = [0, 4.1, 2.05, 1.37, 1.02, 0.68, 0.51, 0.34, 0.26];
+var brsTimer = null;
+
+function setBrsUI(v){
+  v = Math.min(8, Math.max(1, parseInt(v, 10) || 1));
+  $("brs").value = v;
+  $("brsVal").textContent = v + "（约 " + BRS_SEC[v].toFixed(2).replace(/0$/, "") + " 秒一次）";
+}
+
+$("brs").oninput = function(){
+  setBrsUI(this.value);
+  var v = $("brs").value;
+  clearTimeout(brsTimer);
+  brsTimer = setTimeout(function(){ send("s" + v, "呼吸快慢 " + v); }, 400);
+};
+
+// ------------------------------------------------ 单色常亮
+var SWATCHES = [
+  ["白", "FFFFFF"],   ["暖白", "FFD9A0"], ["红", "FF0000"],   ["橙", "FF6A00"],
+  ["琥珀", "FFB000"], ["黄", "FFE800"],   ["黄绿", "A6FF00"], ["绿", "00FF3C"],
+  ["青", "00FFC8"],   ["湖蓝", "00BFFF"], ["蓝", "0000FF"],   ["深蓝", "2030FF"],
+  ["紫", "8A2BE2"],   ["品红", "FF00E0"], ["粉", "FF4FA3"],   ["玫红", "FF2D55"]
+];
+
+var curColor = (localStorage.getItem("stripColor") || "FF8000").toUpperCase();
+
+// 刚动过颜色的一小段时间内，别让板子的回报把选色框拽回去
+// （否则刚点完蓝色，下一次刷新会闪回旧颜色；拖取色盘时更会被打断）
+var colHold = 0;
+function holdColor(){ colHold = Date.now() + 6000; }
+
+function normHex(s){
+  s = String(s || "").trim().replace(/^#/, "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+  if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+  return /^[0-9A-F]{6}$/.test(s) ? s : null;
+}
+
+function showColorUI(hex){
+  curColor = hex;
+  $("col").value    = "#" + hex;
+  $("colHex").value = hex;
+}
+
+function applyColor(hex, note){
+  hex = normHex(hex);
+  if (!hex){ tip("颜色要 6 位，例如 FF8000", "#ff7b72"); return; }
+  holdColor();
+  showColorUI(hex);
+  localStorage.setItem("stripColor", hex);
+  markEffect("纯色常亮");
+  send("c" + hex, note || ("已点亮颜色 " + hex));
+}
+
+(function buildSwatches(){
+  var box = $("swatches");
+  SWATCHES.forEach(function(p){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.title = p[0] + "  #" + p[1];
+    b.style.background = "#" + p[1];
+    b.onclick = function(){ applyColor(p[1], "「" + p[0] + "」已点亮"); };
+    box.appendChild(b);
+  });
+})();
+
+$("col").oninput = function(){ holdColor(); showColorUI(normHex(this.value) || curColor); };
+$("colHex").onchange = function(){
+  var h = normHex(this.value);
+  if (h) { holdColor(); showColorUI(h); }
+  else { showColorUI(curColor); tip("色号要 6 位十六进制，例如 FF8000", "#ff7b72"); }
+};
+$("colOn").onclick = function(){ applyColor($("colHex").value); };
+$("colBreathe").onclick = function(){
+  var h = normHex($("colHex").value);
+  if (!h){ tip("颜色要 6 位，例如 FF8000", "#ff7b72"); return; }
+  holdColor();
+  showColorUI(h);
+  localStorage.setItem("stripColor", h);
+  send("c" + h, "颜色 " + h + " 已设定");
+  setTimeout(function(){ send("f8", "已切到「纯色呼吸」"); markEffect("纯色呼吸"); }, 250);
+};
+
+document.querySelectorAll("#effects button").forEach(function(b){
+  b.onclick = function(){
+    fxButtons().forEach(function(x){ x.classList.remove("cur"); });
+    b.classList.add("cur");
+    curEffect = b.dataset.name;
+    send(b.dataset.cmd, "已切到「" + b.dataset.name + "」");
+  };
+});
+
+
+$("btnTest").onclick = function(){ send("t", "自检开始，看灯带"); };
+$("btnRead").onclick = function(){ send("?", "已经问过板子了，往下看回话"); };
+$("btnReconnect").onclick = function(){
+  api("/api/reconnect").then(function(){ tip("重新找开发板中…"); });
+};
+
+showColorUI(curColor);
+refresh();
+</script>
+</body>
+</html>
