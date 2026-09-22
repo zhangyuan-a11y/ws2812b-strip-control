@@ -24,6 +24,10 @@ metadata:
 
 拷进工程目录，`python3 strip_console.py` 即可。
 
+参考固件在 `firmware/`（ESP32-S3、数据脚 GPIO 4、N16R8），可直接编译烧录，用来起步或对照。
+**协议是稳定的那层，引脚和灯珠数是每台机器自己的事**——换板子照着
+`references/board-protocol.md` 的接口改，不用重写控制台。
+
 **为什么要这层包装**：烧录和 `pio device monitor` 会独占串口，反复开关很痛苦；包成 HTTP 之后，烧录前 `curl .../api/quit` 放开串口、烧完再拉起，全程不用打断用户。
 
 几个要记住的点：

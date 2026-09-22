@@ -25,6 +25,7 @@ git clone https://github.com/zhangyuan-a11y/ws2812b-strip-control.git \
 | `references/pitfalls.md` | 踩坑清单：电气 / 烧录 / 串口 / 渲染 / 持久化 / 协作，共 6 类 |
 | `assets/strip_console.py` | 现成件：把串口包成本地 HTTP 服务（`127.0.0.1:877x`） |
 | `assets/strip_ui.html` | 现成件：配套中文控制台网页（亮度 / 单色 / 灯效 / 呼吸快慢 / 用电上限） |
+| `firmware/` | 参考固件：ESP32-S3 上完整可编译可烧录的实现（含 N16R8 配置、诊断固件、最小验证程序） |
 
 ## 核心结论（三条硬约束）
 
@@ -40,8 +41,9 @@ git clone https://github.com/zhangyuan-a11y/ws2812b-strip-control.git \
 
 - 硬件假设：ESP32 / ESP32-S3（含 N16R8）驱动 5V 的 WS2812B 兼容灯带。
 - 控制台依赖 `pyserial`，`python3 -m pip install pyserial`。
-- **不含固件源码**：灯珠数、引脚、供电方式每次都不同，打包固件反而会限制复用。
-  skill 给的是协议约定和做法，固件按 `references/board-protocol.md` 的接口去实现。
+- `firmware/` 是一份**可直接编译烧录的参考实现**（GPIO 4，N16R8），用来对照和起步；
+  换个板子或换个引脚时，照 `references/board-protocol.md` 的接口改就行——协议是稳定的那层，
+  引脚和灯珠数是每台机器自己的事。
 - 串口命令表和控制台解析规则是**成对绑定**的；换固件要同步改 `strip_console.py` 里的正则。
 
 ## 同任务的其它方案
